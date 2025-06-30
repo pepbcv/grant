@@ -14,8 +14,10 @@
 #define PAGE_SIZE getpagesize()
 
 int main(int argc, char ** argv){
-    uint16_t domid = 3; // ID del ricevente (domuB)
+    uint16_t domid; // ID del ricevente (domuB)
     uint32_t count = 1;
+
+    domid = strtoul(argv[1], NULL, 10);
 
     int gntalloc_fd = open("/dev/xen/gntalloc", O_RDWR);
     if(gntalloc_fd < 0){
