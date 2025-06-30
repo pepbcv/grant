@@ -8,90 +8,90 @@
 #include <sys/mman.h>
 #include <signal.h>
 
-#include <xen/gntalloc.h>      // grant tables
+#include <xen/gntalloc.h>
 #include <xen/event_channel.h> // EVENT!!!!!!!
 
 #define PAGE_SIZE getpagesize()
 
 int main(int argc, char ** argv){
-    uint16_t domid = 3; // ID del ricevente (domuB)
+    uint16_t domid; // domU ricevente (es: domuB)
     uint32_t count = 1;
+
+    if (argc < 2) {
+        fprintf(stderr, "Usage: %s <remote_dom_id>\n", argv[0]);
+        return EXIT_FAILURE;
+    }
+
+    domid = strtoul(argv[1], NULL, 10);
 
     int gntalloc_fd = open("/dev/xen/gntalloc", O_RDWR);
     if(gntalloc_fd < 0){
-        fprintf(stderr, "Couldn't open /dev/xen/gntalloc\n");
+        perror("Couldn't open /dev/xen/gntalloc");
         exit(EXIT_FAILURE);
     }
 
     struct ioctl_gntalloc_alloc_gref* gref = malloc(sizeof(*gref));
-    if(gref == NULL){
-        fprintf(stderr, "Couldn't allocate gref\n");
-        close(gntalloc_fd);
-        exit(EXIT_FAILURE);
-    }
     gref->domid = domid;
     gref->count = count;
     gref->flags = GNTALLOC_FLAG_WRITABLE;
 
-    int err = ioctl(gntalloc_fd, IOCTL_GNTALLOC_ALLOC_GREF, gref);
-    if(err < 0){
-        fprintf(stderr, "IOCTL failed\n");
+    if(ioctl(gntalloc_fd, IOCTL_GNTALLOC_ALLOC_GREF, gref) < 0){
+        perror("IOCTL GNTALLOC failed");
         free(gref);
         close(gntalloc_fd);
         exit(EXIT_FAILURE);
     }
-
-    printf("gref = %u\n", gref->gref_ids[0]);
 
     char* shpages = mmap(NULL, count * PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, gntalloc_fd, gref->index);
     if(shpages == MAP_FAILED){
-        fprintf(stderr, "mapping the grants failed\n");
+        perror("mmap failed");
         free(gref);
         close(gntalloc_fd);
         exit(EXIT_FAILURE);
     }
 
-    // Scrittura messaggio 1024 byte
-    memset(shpages, 'A', 1023);
-    shpages[1023] = '\0';
-
-    // EVENT!!!!!!! — Inizializza unbound channel
+    // EVENT!!!!!!! Allocazione canale evento
     int evtchn_fd = open("/dev/xen/evtchn", O_RDWR);
-    if (evtchn_fd < 0) {
+    if(evtchn_fd < 0){
         perror("Couldn't open /dev/xen/evtchn");
         exit(EXIT_FAILURE);
     }
 
-    struct evtchn_alloc_unbound req = {
-        .dom = 0,            // mio dominio
-        .remote_dom = domid  // ricevente
-    };
-    err = ioctl(evtchn_fd, IOCTL_EVTCHN_ALLOC_UNBOUND, &req);
-    if (err < 0) {
-        perror("Failed to allocate event channel");
+    struct evtchn_alloc_unbound evt;
+    evt.dom = 0; // mio dominio
+    evt.remote_dom = domid;
+
+    if(ioctl(evtchn_fd, IOCTL_EVTCHN_ALLOC_UNBOUND, &evt) < 0){
+        perror("IOCTL_EVTCHN_ALLOC_UNBOUND failed");
         exit(EXIT_FAILURE);
     }
 
-    printf("Porta evento: %u\n", req.port);
+    printf("gref = %u\n", gref->gref_ids[0]);
+    printf("event_channel_port = %u\n", evt.port); // DA COMUNICARE A ricevente
 
-    getchar();  // attesa opzionale
-    // EVENT!!!!!!! — Notifica ricevente
-    ioctl(evtchn_fd, IOCTL_EVTCHN_NOTIFY, &req.port);
-    printf("Mittente ha notificato\n");
+    // Scrivo messaggio
+    memset(shpages, 'A', 1023);
+    shpages[1023] = '\0';
 
-    // Cleanup su CTRL+C
-    int sig;
+    getchar(); // Pausa manuale per sincronia
+
+    // EVENT!!!!!!! Notifica ricevente
+    ioctl(evtchn_fd, IOCTL_EVTCHN_NOTIFY, &evt.port);
+    printf("Mittente ha notificato evento!\n");
+
+    // Cleanup on Ctrl+C
     sigset_t set;
     sigemptyset(&set);
     sigaddset(&set, SIGINT);
+    int sig;
     sigwait(&set, &sig);
 
     munmap(shpages, count * PAGE_SIZE);
     struct ioctl_gntalloc_dealloc_gref dgref = {.index = gref->index, .count = count};
     ioctl(gntalloc_fd, IOCTL_GNTALLOC_DEALLOC_GREF, &dgref);
 
-    free(gref);
     close(gntalloc_fd);
     close(evtchn_fd);
+    free(gref);
     return 0;
 }
