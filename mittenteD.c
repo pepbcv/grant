@@ -23,17 +23,19 @@ int main(int argc, char ** argv){
         exit(EXIT_FAILURE);
     }
 
-    //allocazione strutturae popolamento dei campi
+    //allocazione dinamica struttura che contiene i parametri necessari per la chiamata ioctl (che alloca grant references)
     struct ioctl_gntalloc_alloc_gref* gref = malloc(sizeof(struct ioctl_gntalloc_alloc_gref));
     if(gref == NULL){
         fprintf(stderr, "Couldn't allocate struct ioctl_gntalloc_alloc_gref\n");
         close(gntalloc_fd);
         exit(EXIT_FAILURE);
     }
-    gref->domid = domid;
-    gref->count = count;
+    //la struttura una volta allocata, viene popolata
+    gref->domid = domid; //domID di chi si vuole venga concessa la pagina
+    gref->count = count; //numero di grant references
     gref->flags = GNTALLOC_FLAG_WRITABLE;
 
+    //Invio richiesta al driver gntalloc (con questo comando effettivamente si alloca la pagina e si ottiene il riferimento)
     int err = ioctl(gntalloc_fd, IOCTL_GNTALLOC_ALLOC_GREF, gref);
     if(err < 0){
         fprintf(stderr, "IOCTL failed\n");
@@ -44,7 +46,7 @@ int main(int argc, char ** argv){
 
     printf("gref = %u\n", gref->gref_ids[0]);
 
-    //chiamata map
+    //chiamata map: mappa la memoria tra kernel e spazio utente, cioè con questo comando (a cui passo le info ottenute da ioctl) ottengo un riferimento utilizzabile dalla domU
     char* shpages = mmap(NULL, count*PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, gntalloc_fd, gref->index);
     if(shpages == MAP_FAILED){
         fprintf(stderr, "mapping the grants failed\n");
