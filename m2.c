@@ -53,9 +53,7 @@ int main(int argc, char ** argv){
         exit(EXIT_FAILURE);
     }
 
-    // Scrittura messaggio 1024 byte
-    memset(shpages, 'A', 1023);
-    shpages[1023] = '\0';
+
 
     // EVENT!!!!!!! — Inizializza unbound channel
     int evtchn_fd = open("/dev/xen/evtchn", O_RDWR);
@@ -68,6 +66,7 @@ int main(int argc, char ** argv){
         .dom = 0,            // mio dominio
         .remote_dom = domid  // ricevente
     };
+    
     err = ioctl(evtchn_fd, IOCTL_EVTCHN_ALLOC_UNBOUND, &req);
     if (err < 0) {
         perror("Failed to allocate event channel");
@@ -76,7 +75,14 @@ int main(int argc, char ** argv){
 
     printf("Porta evento: %u\n", req.port);
 
+
+    //scrivo
+    // Scrittura messaggio 1024 byte
+    memset(shpages, 'A', 1023);
+    shpages[1023] = '\0';
+
     getchar();  // attesa opzionale
+    
     // EVENT!!!!!!! — Notifica ricevente
     ioctl(evtchn_fd, IOCTL_EVTCHN_NOTIFY, &req.port);
     printf("Mittente ha notificato\n");
