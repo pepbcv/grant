@@ -12,6 +12,7 @@
 
 #define PAGE_SIZE getpagesize()
 
+//passa come parametri domuA_ID e grant_ref
 int main(int argc, char ** argv){
     int i;
     uint32_t nb_grant = 1;
