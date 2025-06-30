@@ -63,7 +63,10 @@ int main(int argc, char ** argv){
         exit(EXIT_FAILURE);
     }
 
-    printf("%s\n", shbuf);
+    //printf("%s\n", shbuf);
+    fwrite(shbuf, 1, 1024, stdout);
+    printf("\n");
+
 
     err = munmap(shbuf, nb_grant*PAGE_SIZE);
     if(err < 0){
