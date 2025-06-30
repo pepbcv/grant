@@ -13,7 +13,7 @@
 #define PAGE_SIZE getpagesize()
 
 int main(int argc, char ** argv){
-    uint16_t domid = 0; //We set to share these grants with Dom0
+    uint16_t domid = 3; //We set to share these grants with Dom0 (domID della vm a cui si vuole dare accesso, cioè domuB_id)
     uint32_t count = 1; //We want to allocate one grant/page
 
     //apertura file descriptor sul nodo driver
