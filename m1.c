@@ -56,7 +56,9 @@ int main(int argc, char ** argv){
         exit(EXIT_FAILURE);
     }
 
-    sprintf(shpages, "Hello, World!");
+    //sprintf(shpages, "Hello, World!");
+    memset(shpages, 'A', 1023);
+    shpages[1023] = '\0';
 
     /**
      * We wait for interrupt to begin cleaning up
