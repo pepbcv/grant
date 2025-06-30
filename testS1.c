@@ -1,14 +1,21 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
+#include <string.h>
 #include <fcntl.h>
 #include <unistd.h>
-#include <sys/mman.h>
-#include <string.h>
-#include <stdint.h>
-#include <linux/ioctl.h>
-#include <xen/grant_table.h>
+#include <sys/ioctl.h>
 
-#define PAGE_SIZE 4096
+// Definizione locale (manuale) per allocazione grant reference
+#define IOCTL_GNTDEV_ALLOC_GREF _IOWR('G', 0, struct ioctl_gntdev_alloc_gref)
+
+struct ioctl_gntdev_alloc_gref {
+    uint16_t domid;      // ID del dominio ricevente
+    uint16_t flags;      // Non usato per ora
+    uint32_t count;      // Numero di grant refs da allocare
+    uint64_t index;      // Offset per mmap()
+    uint32_t gref_ids[1]; // Grant ref ID generati
+};
 
 int main() {
     int gnt_fd = open("/dev/xen/gntdev", O_RDWR);
@@ -17,50 +24,21 @@ int main() {
         return 1;
     }
 
-    // Alloca una pagina di memoria condivisibile
-    void *shared_page = mmap(NULL, PAGE_SIZE, PROT_READ | PROT_WRITE,
-                             MAP_SHARED, gnt_fd, 0);
-    if (shared_page == MAP_FAILED) {
-        perror("mmap fallita");
-        close(gnt_fd);
-        return 1;
-    }
+    struct ioctl_gntdev_alloc_gref alloc;
+    memset(&alloc, 0, sizeof(alloc));
+    alloc.domid = 6;  // ← DomU ricevente
+    alloc.count = 1;
 
-    // Richiede un grant reference
-    struct ioctl_gntdev_alloc_gref alloc = {
-        .domid = 3,  // da rimpiazzare con DomU-B ID (es: 6)
-        .count = 1
-    };
-    struct ioctl_gntdev_gref gref;
-
-    alloc.gref_ids = (uintptr_t)&gref;
     if (ioctl(gnt_fd, IOCTL_GNTDEV_ALLOC_GREF, &alloc) == -1) {
-        perror("Errore nell'allocazione grant");
-        munmap(shared_page, PAGE_SIZE);
+        perror("Errore ioctl GNTDEV_ALLOC_GREF");
         close(gnt_fd);
         return 1;
     }
 
-    printf("Grant ref assegnato: %d\n", gref.gref_id);
+    printf("Grant reference allocato: gref_id = %u\n", alloc.gref_ids[0]);
+    printf("Offset per mmap: %lu\n", alloc.index);
 
-    // Scrive un messaggio nella pagina
-    snprintf((char *)shared_page, PAGE_SIZE, "Hello from DomU-A");
-
-    // Scrive il grant ref su file per DomU-B
-    FILE *f = fopen("grant.txt", "w");
-    if (f) {
-        fprintf(f, "%d\n", gref.gref_id);
-        fclose(f);
-        printf("Grant ref scritto su grant.txt\n");
-    }
-
-    // [Placeholder] Setup event channel in futuro
-    // ...
-
-    printf("Messaggio scritto. Rimane attivo per debugging...\n");
-    sleep(10);
-
-    munmap(shared_page, PAGE_SIZE);
     close(gnt_fd);
     return 0;
 }
+
