@@ -8,7 +8,7 @@
 #include <sys/mman.h>
 #include <signal.h>
 
-#include <xen/gntalloc.h>
+#include <xen/gntalloc.h> //inclusione driver per funzionalià grant tables
 
 #define PAGE_SIZE getpagesize()
 
@@ -16,12 +16,14 @@ int main(int argc, char ** argv){
     uint16_t domid = 0; //We set to share these grants with Dom0
     uint32_t count = 1; //We want to allocate one grant/page
 
+    //apertura file descriptor sul nodo driver
     int gntalloc_fd = open("/dev/xen/gntalloc", O_RDWR);
     if(gntalloc_fd < 0){
         fprintf(stderr, "Couldn't open /dev/xen/gntalloc\n");
         exit(EXIT_FAILURE);
     }
 
+    //allocazione strutturae popolamento dei campi
     struct ioctl_gntalloc_alloc_gref* gref = malloc(sizeof(struct ioctl_gntalloc_alloc_gref));
     if(gref == NULL){
         fprintf(stderr, "Couldn't allocate struct ioctl_gntalloc_alloc_gref\n");
@@ -42,6 +44,7 @@ int main(int argc, char ** argv){
 
     printf("gref = %u\n", gref->gref_ids[0]);
 
+    //chiamata map
     char* shpages = mmap(NULL, count*PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, gntalloc_fd, gref->index);
     if(shpages == MAP_FAILED){
         fprintf(stderr, "mapping the grants failed\n");
