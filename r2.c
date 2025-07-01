@@ -7,69 +7,84 @@
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 
-#include <xen/gntdev.h>
 #include <xen/grant_table.h>
+#include <xen/gntdev.h>
 
 #define PAGE_SIZE getpagesize()
-#define MSG_SIZE 1023
 
-int main(int argc, char **argv) {
-    if (argc < 3) {
-        fprintf(stderr, "Usage: %s <sender_domid> <gref>\n", argv[0]);
-        return 1;
-    }
-
-    uint16_t domid = strtoul(argv[1], NULL, 10);
-    uint32_t gref_id = strtoul(argv[2], NULL, 10);
+//passa come parametri domuA_ID e grant_ref
+int main(int argc, char ** argv){
+    int i;
     uint32_t nb_grant = 1;
+    uint16_t domid;
+    uint32_t* refid = malloc(sizeof(uint32_t) * nb_grant);
 
+    domid = strtoul(argv[1], NULL, 10);
+    refid[0] = strtoul(argv[2], NULL, 10);
+
+    //aprire file descriptor sul nodo gntdev
     int gntdev_fd = open("/dev/xen/gntdev", O_RDWR);
-    if (gntdev_fd < 0) {
-        perror("Couldn't open /dev/xen/gntdev");
+    if(gntdev_fd < 0){
+        fprintf(stderr, "Couldn't open /dev/xen/gntdev\n");
         exit(EXIT_FAILURE);
     }
 
-    struct ioctl_gntdev_map_grant_ref *gref =
-        malloc(sizeof(*gref) + (nb_grant - 1) * sizeof(struct ioctl_gntdev_grant_ref));
+    //allocazione struttura che serve a comunicare al kernel quali grant vogliamo mappare (allochaimo nb_grant elementi - 1, perchè perche la struct già ne include uno) 
+    struct ioctl_gntdev_map_grant_ref* gref = malloc(sizeof(struct ioctl_gntdev_map_grant_ref) + (nb_grant-1) * sizeof(struct ioctl_gntdev_grant_ref));
+    if(gref == NULL){
+        fprintf(stderr, "Couldn't allocate struct ioctl_gntdev_map_grant_ref\n");
+        close(gntdev_fd);
+        exit(EXIT_FAILURE);
+    }
+
+    //popolamento con i grant ricevuti dal mittente
     gref->count = nb_grant;
-    gref->refs[0].domid = domid;
-    gref->refs[0].ref = gref_id;
+    for(i = 0; i < nb_grant; i++){
+        struct ioctl_gntdev_grant_ref* ref = &gref->refs[i];
+        ref->domid = domid;
+        ref->ref = refid[i];
+    }
 
-    if (ioctl(gntdev_fd, IOCTL_GNTDEV_MAP_GRANT_REF, gref) < 0) {
-        perror("IOCTL_MAP_GREF failed");
+    //chiamata al driver per far mappare pagine esterne nel proprio processo
+    int err = ioctl(gntdev_fd, IOCTL_GNTDEV_MAP_GRANT_REF, gref);
+    if(err < 0){
+        fprintf(stderr, "IOCTL failed\n");
+        free(gref); free(refid);
         close(gntdev_fd);
-        free(gref);
         exit(EXIT_FAILURE);
     }
 
-    char *shbuf = mmap(NULL, nb_grant * PAGE_SIZE, PROT_READ | PROT_WRITE,
-                       MAP_SHARED, gntdev_fd, gref->index);
-    if (shbuf == MAP_FAILED) {
-        perror("mmap failed");
+    //ottenimento di un puntatore userspace per avere accesso alla memoria lato domU
+    char* shbuf = mmap(NULL, nb_grant*PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, gntdev_fd, gref->index);
+    if(shbuf == MAP_FAILED){
+        fprintf(stderr, "Failed mapping the grant references\n");
+        free(gref); free(refid);
         close(gntdev_fd);
-        free(gref);
         exit(EXIT_FAILURE);
     }
 
-    for (int i = 0; i < 10; i++) {
-        while (shbuf[0] != 1) usleep(100);  // attende notifica
+    //printf("%s\n", shbuf);
+    fwrite(shbuf, 1, 1024, stdout);
+    printf("\n");
 
-        printf("Ricevuto messaggio %d: ", i + 1);
-        fwrite(shbuf + 1, 1, MSG_SIZE, stdout);
-        printf("\n");
 
-        shbuf[0] = 0;  // resetta flag
+    err = munmap(shbuf, nb_grant*PAGE_SIZE);
+    if(err < 0){
+        fprintf(stderr, "Unmapping the grants failed\n");
     }
 
-    munmap(shbuf, nb_grant * PAGE_SIZE);
+    struct ioctl_gntdev_unmap_grant_ref ugref;
+    ugref.index = gref->index;
+    ugref.count = nb_grant;
 
-    struct ioctl_gntdev_unmap_grant_ref ugref = {
-        .index = gref->index,
-        .count = nb_grant
-    };
-    ioctl(gntdev_fd, IOCTL_GNTDEV_UNMAP_GRANT_REF, &ugref);
+    err = ioctl(gntdev_fd, IOCTL_GNTDEV_UNMAP_GRANT_REF, &ugref);
+    if(err < 0){
+        fprintf(stderr, "IOCTL for unmap failed\n");
+    }
 
-    close(gntdev_fd);
+
     free(gref);
-    return 0;
+    free(refid);
+    close(gntdev_fd);
+    exit(EXIT_SUCCESS);
 }
