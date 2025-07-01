@@ -7,6 +7,9 @@
 #include <signal.h>
 #include <xen/event_channel.h> // EVENT CHANNELS
 
+#define IOCTL_EVTCHN_ALLOC_UNBOUND 0x40044501
+#define IOCTL_EVTCHN_NOTIFY        0x40044506
+
 int main(int argc, char** argv) {
     if (argc < 2) {
         fprintf(stderr, "Usage: %s <remote_dom_id>\n", argv[0]);
