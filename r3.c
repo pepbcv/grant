@@ -6,16 +6,14 @@
 #include <fcntl.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
-#include <time.h>                  // TEMPO!!
+#include <time.h> // TEMPO!!
 
 #include <xen/grant_table.h>
 #include <xen/gntdev.h>
 
 #define PAGE_SIZE getpagesize()
 
-// passa come parametri domuA_ID e grant_ref
 int main(int argc, char ** argv){
-    int i;
     uint32_t nb_grant = 1;
     uint16_t domid;
     uint32_t* refid = malloc(sizeof(uint32_t) * nb_grant);
@@ -37,10 +35,9 @@ int main(int argc, char ** argv){
     }
 
     gref->count = nb_grant;
-    for(i = 0; i < nb_grant; i++){
-        struct ioctl_gntdev_grant_ref* ref = &gref->refs[i];
-        ref->domid = domid;
-        ref->ref = refid[i];
+    for(int i = 0; i < nb_grant; i++){
+        gref->refs[i].domid = domid;
+        gref->refs[i].ref = refid[i];
     }
 
     int err = ioctl(gntdev_fd, IOCTL_GNTDEV_MAP_GRANT_REF, gref);
@@ -51,7 +48,7 @@ int main(int argc, char ** argv){
         exit(EXIT_FAILURE);
     }
 
-    char* shbuf = mmap(NULL, nb_grant*PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, gntdev_fd, gref->index);
+    char* shbuf = mmap(NULL, nb_grant * PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, gntdev_fd, gref->index);
     if(shbuf == MAP_FAILED){
         fprintf(stderr, "Failed mapping the grant references\n");
         free(gref); free(refid);
@@ -59,39 +56,39 @@ int main(int argc, char ** argv){
         exit(EXIT_FAILURE);
     }
 
-    for (int i = 0; i < 10; i++) {
+    // TEMPO!!
+    struct timespec start_time, end_time;
+    double total_latency = 0;
+
+    for (int i = 0; i < 10000; i++) {
         while (shbuf[0] != 1);
 
-        char raw[1024];                                    // TEMPO!!
-        memcpy(raw, shbuf + 1, 1023);                       // TEMPO!!
-        raw[1023] = '\0';                                  // TEMPO!!
+        // TEMPO!! - Tempo attuale alla ricezione
+        clock_gettime(CLOCK_MONOTONIC, &end_time);
 
-        long sent_sec, sent_nsec;                          // TEMPO!!
-        char msg[900];                                     // TEMPO!!
-        sscanf(raw, "%ld|%ld|%899[^\n]", &sent_sec, &sent_nsec, msg); // TEMPO!!
+        // TEMPO!! - Lettura timestamp dal mittente
+        struct timespec sent_time;
+        memcpy(&sent_time, shbuf + 1, sizeof(struct timespec));
 
-        struct timespec now;                               // TEMPO!!
-        clock_gettime(CLOCK_MONOTONIC, &now);              // TEMPO!!
+        // TEMPO!! - Calcolo latenza
+        double latency = (end_time.tv_sec - sent_time.tv_sec) +
+                         (end_time.tv_nsec - sent_time.tv_nsec) / 1e9;
+        total_latency += latency;
 
-        long latency_ns = (now.tv_sec - sent_sec) * 1000000000L + (now.tv_nsec - sent_nsec); // TEMPO!!
-        printf("Ricevuto: %s\nLatenza: %ld ns\n", msg, latency_ns); // TEMPO!!
-
+        printf("Ricevente ha ricevuto: %s | Latenza: %.6f s\n", shbuf + 1 + sizeof(struct timespec), latency);
         shbuf[0] = 0;
     }
 
-    err = munmap(shbuf, nb_grant*PAGE_SIZE);
+    // TEMPO!! - Stampa latenza media
+    printf("Latenza media: %.6f secondi\n", total_latency / 10000);
+
+    err = munmap(shbuf, nb_grant * PAGE_SIZE);
     if(err < 0){
         fprintf(stderr, "Unmapping the grants failed\n");
     }
 
-    struct ioctl_gntdev_unmap_grant_ref ugref;
-    ugref.index = gref->index;
-    ugref.count = nb_grant;
-
-    err = ioctl(gntdev_fd, IOCTL_GNTDEV_UNMAP_GRANT_REF, &ugref);
-    if(err < 0){
-        fprintf(stderr, "IOCTL for unmap failed\n");
-    }
+    struct ioctl_gntdev_unmap_grant_ref ugref = {.index = gref->index, .count = nb_grant};
+    ioctl(gntdev_fd, IOCTL_GNTDEV_UNMAP_GRANT_REF, &ugref);
 
     free(gref);
     free(refid);
