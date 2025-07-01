@@ -67,7 +67,7 @@ int main(int argc, char ** argv){
     //fwrite(shbuf, 1, 1024, stdout);
     //printf("\n");
     
-    for (int i = 0; i < 10; i++) {
+    //for (int i = 0; i < 10; i++) {
     // Aspetto che ci sia un messaggio da leggere
     while (shbuf[0] != 1);
 
@@ -76,7 +76,7 @@ int main(int argc, char ** argv){
 
     // Resetto il flag per permettere al mittente di scrivere il prossimo
     shbuf[0] = 0;
-    }
+    //}
 
 
     err = munmap(shbuf, nb_grant*PAGE_SIZE);
