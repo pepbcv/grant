@@ -7,81 +7,69 @@
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 
-#include <xen/grant_table.h>
 #include <xen/gntdev.h>
-#include <xen/event_channel.h> // EVENT!!!!!!!
+#include <xen/grant_table.h>
 
 #define PAGE_SIZE getpagesize()
+#define MSG_SIZE 1023
 
-int main(int argc, char ** argv){
-    if (argc < 4) {
-        fprintf(stderr, "Usage: %s <domA_ID> <grant_ref> <event_channel_port>\n", argv[0]);
-        return EXIT_FAILURE;
+int main(int argc, char **argv) {
+    if (argc < 3) {
+        fprintf(stderr, "Usage: %s <sender_domid> <gref>\n", argv[0]);
+        return 1;
     }
 
     uint16_t domid = strtoul(argv[1], NULL, 10);
-    uint32_t refid = strtoul(argv[2], NULL, 10);
-    evtchn_port_t port = strtoul(argv[3], NULL, 10);
+    uint32_t gref_id = strtoul(argv[2], NULL, 10);
+    uint32_t nb_grant = 1;
 
-    // GRANT TABLE
     int gntdev_fd = open("/dev/xen/gntdev", O_RDWR);
-    if(gntdev_fd < 0){
+    if (gntdev_fd < 0) {
         perror("Couldn't open /dev/xen/gntdev");
         exit(EXIT_FAILURE);
     }
 
-    struct ioctl_gntdev_map_grant_ref* gref = malloc(sizeof(*gref));
-    gref->count = 1;
+    struct ioctl_gntdev_map_grant_ref *gref =
+        malloc(sizeof(*gref) + (nb_grant - 1) * sizeof(struct ioctl_gntdev_grant_ref));
+    gref->count = nb_grant;
     gref->refs[0].domid = domid;
-    gref->refs[0].ref = refid;
+    gref->refs[0].ref = gref_id;
 
-    if(ioctl(gntdev_fd, IOCTL_GNTDEV_MAP_GRANT_REF, gref) < 0){
-        perror("IOCTL GNTDEV failed");
-        free(gref);
+    if (ioctl(gntdev_fd, IOCTL_GNTDEV_MAP_GRANT_REF, gref) < 0) {
+        perror("IOCTL_MAP_GREF failed");
         close(gntdev_fd);
+        free(gref);
         exit(EXIT_FAILURE);
     }
 
-    char* shbuf = mmap(NULL, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, gntdev_fd, gref->index);
-    if(shbuf == MAP_FAILED){
+    char *shbuf = mmap(NULL, nb_grant * PAGE_SIZE, PROT_READ | PROT_WRITE,
+                       MAP_SHARED, gntdev_fd, gref->index);
+    if (shbuf == MAP_FAILED) {
         perror("mmap failed");
-        free(gref);
         close(gntdev_fd);
+        free(gref);
         exit(EXIT_FAILURE);
     }
 
-    // EVENT!!!!!!! — BIND della porta evento
-    int evtchn_fd = open("/dev/xen/evtchn", O_RDWR);
-    if(evtchn_fd < 0){
-        perror("Couldn't open /dev/xen/evtchn");
-        exit(EXIT_FAILURE);
+    for (int i = 0; i < 10; i++) {
+        while (shbuf[0] != 1) usleep(100);  // attende notifica
+
+        printf("Ricevuto messaggio %d: ", i + 1);
+        fwrite(shbuf + 1, 1, MSG_SIZE, stdout);
+        printf("\n");
+
+        shbuf[0] = 0;  // resetta flag
     }
 
-    struct evtchn_bind_port bind = {.port = port};
-    if(ioctl(evtchn_fd, IOCTL_EVTCHN_BIND, &bind) < 0){
-        perror("IOCTL_EVTCHN_BIND failed");
-        exit(EXIT_FAILURE);
-    }
+    munmap(shbuf, nb_grant * PAGE_SIZE);
 
-    printf("Ricevente in attesa evento sulla porta %u...\n", port);
-
-    // Attesa evento
-    evtchn_port_t fired_port;
-    read(evtchn_fd, &fired_port, sizeof(fired_port));
-    printf("Evento ricevuto su porta: %u\n", fired_port);
-
-    // Lettura messaggio
-    fwrite(shbuf, 1, 1024, stdout);
-    printf("\n");
-
-    // Cleanup
-    munmap(shbuf, PAGE_SIZE);
-    struct ioctl_gntdev_unmap_grant_ref ugref = {.index = gref->index, .count = 1};
+    struct ioctl_gntdev_unmap_grant_ref ugref = {
+        .index = gref->index,
+        .count = nb_grant
+    };
     ioctl(gntdev_fd, IOCTL_GNTDEV_UNMAP_GRANT_REF, &ugref);
 
     close(gntdev_fd);
-    close(evtchn_fd);
     free(gref);
     return 0;
 }
-
