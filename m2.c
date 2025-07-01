@@ -60,7 +60,7 @@ int main(int argc, char ** argv){
     //memset(shpages, 'A', 1023);
     //shpages[1023] = '\0';
     
-    for (int i = 0; i < 10; i++) {
+    //for (int i = 0; i < 10; i++) {
     // Aspetto che il ricevente abbia letto il messaggio precedente
     while (shpages[0] != 0);
 
@@ -70,7 +70,7 @@ int main(int argc, char ** argv){
     // Imposto il flag per notificare il ricevente
     shpages[0] = 1;
     printf("Mittente ha inviato: Messaggio numero %d\n", i);
-	}
+//}
     
     
 
