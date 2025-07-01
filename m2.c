@@ -59,8 +59,21 @@ int main(int argc, char ** argv){
     }
 
     //sprintf(shpages, "Hello, World!");
-    memset(shpages, 'A', 1023);
-    shpages[1023] = '\0';
+    //memset(shpages, 'A', 1023);
+    //shpages[1023] = '\0';
+    
+    for (int i = 0; i < 10; i++) {
+    // Aspetto che il ricevente abbia letto il messaggio precedente
+    while (shpages[0] != 0);
+
+    // Scrivo il messaggio
+    snprintf(shpages + 1, 1023, "Messaggio numero %d", i);
+
+    // Imposto il flag per notificare il ricevente
+    shpages[0] = 1;
+    printf("Mittente ha inviato: Messaggio numero %d\n", i);
+	}
+    
 
     /**
      * We wait for interrupt to begin cleaning up
