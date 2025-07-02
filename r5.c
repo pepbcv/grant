@@ -50,22 +50,22 @@ int main(int argc, char ** argv){
     struct timespec sent, received;
 
     for (int i = 0; i < 10; i++) {
-        while (shbuf[0] != 1);
+        
+    	// Set flag per consentire scrittura
+    	shbuf[0] = 0;
 
-        __sync_synchronize(); // SYNC!
-        memcpy(&sent, shbuf + 1, sizeof(struct timespec));
-		clock_gettime(CLOCK_MONOTONIC, &received); // TEMPO!!
+    	struct timespec start, end;
+    	clock_gettime(CLOCK_MONOTONIC, &start);  // TEMPO INIZIO
 
-		// DEBUG
-		printf("DEBUG Ricevente: sent_time = %ld.%09ld, recv_time = %ld.%09ld\n",
-       		sent.tv_sec, sent.tv_nsec,
-       		received.tv_sec, received.tv_nsec);
-            
-        long delta_ns = (received.tv_sec - sent.tv_sec) * 1e9 + (received.tv_nsec - sent.tv_nsec);
-        printf("Ricevuto %d, latenza: %ld ns\n", i, delta_ns);
+    	while (shbuf[0] != 1); // Polling
 
-        shbuf[0] = 0;
-    }
+    	clock_gettime(CLOCK_MONOTONIC, &end);    // TEMPO FINE
+
+    	long latency_ns = (end.tv_sec - start.tv_sec) * 1e9 + (end.tv_nsec - start.tv_nsec);
+    	printf("Latenza msg %d: %ld ns\n", i, latency_ns);
+
+    	printf("Messaggio ricevuto: %s\n", shbuf + 1);
+	}	
 
     munmap(shbuf, nb_grant * PAGE_SIZE);
     struct ioctl_gntdev_unmap_grant_ref ugref = {.index = gref->index, .count = nb_grant};
