@@ -10,7 +10,7 @@ free -h >> "$LOGFILE"
 top -b -n1 | grep "Cpu(s)" >> "$LOGFILE"
 echo "-------------------------------" >> "$LOGFILE"
 
-echo "Avvio ricevente (r7) con domid = $DOMIDA e grant_ref = $GREF..."
+echo "Avvio ricevente..."
 sudo ./r7 "$DOMIDA" "$GREF"
 
 echo "-------------------------------" >> "$LOGFILE"
