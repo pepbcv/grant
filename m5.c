@@ -61,9 +61,8 @@ int main(int argc, char ** argv){
         while (shpages[0] != 0);
 
         clock_gettime(CLOCK_MONOTONIC, &send_time);  // TEMPO!!
-
-        memcpy(shpages + 1, &send_time, sizeof(struct timespec)); // scrittura tempo
-        __sync_synchronize(); // SYNC!
+		printf("DEBUG Mittente: send_time = %ld.%09ld\n", send_time.tv_sec, send_time.tv_nsec);  // DEBUG
+		memcpy(shpages + 1, &send_time, sizeof(struct timespec)); // scrittura tempo
 
         shpages[0] = 1;
         printf("Mittente ha inviato: %d\n", i);
