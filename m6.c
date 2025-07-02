@@ -51,11 +51,13 @@ int main(int argc, char ** argv){
         close(gntalloc_fd);
         exit(EXIT_FAILURE);
     }
+    
+    sleep(30);
 
     for (int i = 0; i < 10000; i++) {
         while (shpages[0] != 0);  // attendo che il ricevente legga
 
-        // TEMPO!! — Costruzione messaggio leggibile + padding
+        //Costruzione messaggio leggibile + padding
         char msg[1024];
         snprintf(msg, 128, "Messaggio numero %d", i); // parte leggibile
         memset(msg + strlen(msg), 'X', 1023 - strlen(msg)); // padding
