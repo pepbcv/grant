@@ -57,6 +57,9 @@ int main(int argc, char ** argv){
 
     // TEMPO!! — Lettura + misurazione latenza
     long total_latency = 0;
+    
+    struct timespec global_start, global_end;
+	clock_gettime(CLOCK_MONOTONIC, &global_start); // THROUGHPUT - Prendo il tempo prima del primo messaggio
 
     for (int i = 0; i < 10000; i++) {
         
@@ -75,8 +78,22 @@ int main(int argc, char ** argv){
         printf("Ricevuto: %.*s | Latenza: %ld ns\n", 40, shbuf + 1, latency_ns);
         
     }
+    
+    clock_gettime(CLOCK_MONOTONIC, &global_end); // THROUGHPUT - Prendo il tempo dopo l'ultimo messaggio 
 
     printf("LATENZA MEDIA: %.2f µs\n", total_latency / 10000.0 / 1000.0);
+    
+    //TROUGHPUT
+    long delta_sec = global_end.tv_sec - global_start.tv_sec;
+	long delta_nsec = global_end.tv_nsec - global_start.tv_nsec;
+	double total_time_sec = delta_sec + delta_nsec / 1e9;
+
+	double total_data_bytes = 10000 * 1024;
+	double throughput_bytes_per_sec = total_data_bytes / total_time_sec;
+	double throughput_mbps = (throughput_bytes_per_sec * 8) / 1e6;
+
+	printf("Throughput: %.2f MB/s (%.2f Mb/s)\n", throughput_bytes_per_sec / 1e6, throughput_mbps);
+
 
     err = munmap(shbuf, nb_grant*PAGE_SIZE);
     struct ioctl_gntdev_unmap_grant_ref ugref = {.index = gref->index, .count = nb_grant};
