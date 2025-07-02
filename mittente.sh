@@ -1,20 +1,25 @@
 #!/bin/bash
 
+if [ $# -ne 1 ]; then
+  echo "Uso: $0 <domid>"
+  exit 1
+fi
+
 DOMID=$1
+
 LOGFILE="mittente_metrics.log"
 
-echo "=== STATO PRIMA DEL TEST ===" > "$LOGFILE"
-date >> "$LOGFILE"
+echo "Stato prima del test:" > "$LOGFILE"
 free -h >> "$LOGFILE"
 top -b -n1 | grep "Cpu(s)" >> "$LOGFILE"
 echo "-------------------------------" >> "$LOGFILE"
 
-START=$(date +%s.%N)
-sudo ./r7 "$DOMID" >> "$LOGFILE"
-END=$(date +%s.%N)
+echo "Avvio mittente..."
+sudo ./m7 "$DOMID"
 
-echo "=== STATO DOPO IL TEST ===" >> "$LOGFILE"
-date >> "$LOGFILE"
+echo "-------------------------------" >> "$LOGFILE"
+echo "Stato dopo il test:" >> "$LOGFILE"
 free -h >> "$LOGFILE"
 top -b -n1 | grep "Cpu(s)" >> "$LOGFILE"
-echo "Durata totale (sec): $(echo "$END - $START" | bc)" >> "$LOGFILE"
+
+echo "Test completato. Risultati salvati in $LOGFILE"
