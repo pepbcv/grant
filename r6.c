@@ -59,17 +59,21 @@ int main(int argc, char ** argv){
     long total_latency = 0;
 
     for (int i = 0; i < 10000; i++) {
+        
         struct timespec start, end;
-        clock_gettime(CLOCK_MONOTONIC, &start);
+        
+        shbuf[0] = 0;
+        clock_gettime(CLOCK_MONOTONIC, &start); //INIZIO
 
         while (shbuf[0] != 1);
 
-        clock_gettime(CLOCK_MONOTONIC, &end);
+        clock_gettime(CLOCK_MONOTONIC, &end); //FINE
+        
         long latency_ns = (end.tv_sec - start.tv_sec) * 1e9 + (end.tv_nsec - start.tv_nsec);
         total_latency += latency_ns;
 
         printf("Ricevuto: %.*s | Latenza: %ld ns\n", 40, shbuf + 1, latency_ns);
-        shbuf[0] = 0;
+        
     }
 
     printf("LATENZA MEDIA: %.2f µs\n", total_latency / 10000.0 / 1000.0);
