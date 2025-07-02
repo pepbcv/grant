@@ -54,8 +54,13 @@ int main(int argc, char ** argv){
 
         __sync_synchronize(); // SYNC!
         memcpy(&sent, shbuf + 1, sizeof(struct timespec));
-        clock_gettime(CLOCK_MONOTONIC, &received); // TEMPO!!
+		clock_gettime(CLOCK_MONOTONIC, &received); // TEMPO!!
 
+		// DEBUG
+		printf("DEBUG Ricevente: sent_time = %ld.%09ld, recv_time = %ld.%09ld\n",
+       		sent.tv_sec, sent.tv_nsec,
+       		received.tv_sec, received.tv_nsec);
+            
         long delta_ns = (received.tv_sec - sent.tv_sec) * 1e9 + (received.tv_nsec - sent.tv_nsec);
         printf("Ricevuto %d, latenza: %ld ns\n", i, delta_ns);
 
