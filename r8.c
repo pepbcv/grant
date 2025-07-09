@@ -1,3 +1,20 @@
+#include <stdlib.h>
+#include <stdio.h>
+#include <stdint.h>
+#include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/ioctl.h>
+#include <sys/mman.h>
+#include <time.h>
+
+#include <xen/grant_table.h>
+#include <xen/gntdev.h>
+
+#define PAGE_SIZE getpagesize()
+#define MESSAGE_SIZE 1024
+
+
 int main(int argc, char ** argv){
     int i;
     uint32_t nb_grant = 1;
